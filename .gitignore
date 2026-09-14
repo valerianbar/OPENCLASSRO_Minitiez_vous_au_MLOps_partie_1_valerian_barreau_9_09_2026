@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Kaggle data (volumineux, non versionné)
+input/
+
+# Fichiers de soumission générés
+*.csv
+
+# Notebooks
+.ipynb_checkpoints/
+
+# MLflow (à venir)
+mlruns/
+mlartifacts/

@@ -1,0 +1,17 @@
+[project]
+name = "initiez-vous-au-mlops-partie-1"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = "==3.13.*"
+dependencies = [
+    "catboost>=1.2.10",
+    "lightgbm>=4.7.0",
+    "matplotlib>=3.11.1",
+    "numpy>=2.5.3",
+    "pandas>=3.0.5",
+    "scikit-learn>=1.9.0",
+    "seaborn>=0.13.2",
+    "shap>=0.52.0",
+    "xgboost>=3.4.1",
+]
