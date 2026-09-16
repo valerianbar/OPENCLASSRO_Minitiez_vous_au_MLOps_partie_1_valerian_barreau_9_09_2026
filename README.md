@@ -7,11 +7,13 @@
 ![XGBoost](https://img.shields.io/badge/XGBoost-3.4-EB0F00)
 ![CatBoost](https://img.shields.io/badge/CatBoost-1.2-FFCC00)
 ![SHAP](https://img.shields.io/badge/SHAP-explainability-1F77B4)
+![MLflow](https://img.shields.io/badge/MLflow-tracking-0194E2?logo=mlflow&logoColor=white)
 
 Projet du parcours **OpenClassrooms — Initiez-vous au MLOps (Partie 1)**.
-On y construit une première brique de modélisation *machine learning* sur les
-données **[Home Credit Default Risk](https://www.kaggle.com/c/home-credit-default-risk)**,
-avant d'y ajouter le suivi d'expériences avec **MLflow** dans la suite du parcours.
+On construit une chaîne de *machine learning* complète sur les données
+**[Home Credit Default Risk](https://www.kaggle.com/c/home-credit-default-risk)** :
+de l'analyse exploratoire jusqu'au **suivi d'expériences (MLflow)**, à
+l'**optimisation des hyperparamètres** et au **choix d'un seuil de décision métier**.
 
 ---
 
@@ -22,56 +24,98 @@ Prédire si un client remboursera son prêt ou aura des **difficultés de paieme
 
 - **Type** : apprentissage supervisé, **classification binaire**
   (`TARGET = 0` remboursé · `TARGET = 1` défaut de paiement).
-- **Métrique** : **ROC AUC** (adaptée au fort déséquilibre des classes ~92 % / 8 %).
-- **Sortie** : une **probabilité** de défaut par client (et non une décision 0/1).
+- **Métrique de classement** : **ROC AUC** (adaptée au fort déséquilibre ~92 % / 8 %).
+- **Sortie** : une **probabilité** de défaut par client, convertie en décision via un **seuil**.
 
 ## 🧭 Démarche
 
-Le notebook [`start-here-a-gentle-introduction.ipynb`](start-here-a-gentle-introduction.ipynb)
-déroule un projet ML complet :
+Tout est dans le notebook
+[`start-here-a-gentle-introduction.ipynb`](start-here-a-gentle-introduction.ipynb) :
 
-1. **Analyse exploratoire (EDA)** — distribution de la cible, valeurs manquantes,
-   détection d'anomalies (ex. `DAYS_EMPLOYED = 365243`), corrélations.
-2. **Préparation des données** — encodage des variables catégorielles
-   (label / one-hot), imputation, mise à l'échelle, alignement train/test.
-3. **Feature engineering** — variables polynomiales + features « métier »
-   (ratios crédit/revenu, durée du prêt, ancienneté relative…).
-4. **Modélisation & comparaison** — plusieurs modèles évalués selon le **même
-   protocole** (validation croisée K-Fold, ROC AUC out-of-fold).
+1. **Analyse exploratoire (EDA)** — cible, valeurs manquantes, anomalies, corrélations.
+2. **Préparation des données** — encodage (label / one-hot), imputation, mise à l'échelle, alignement train/test.
+3. **Feature engineering** — variables polynomiales + features « métier » (ratios crédit/revenu, durée, ancienneté…).
+4. **Comparaison de modèles** — protocole unifié (K-Fold, ROC AUC out-of-fold).
 5. **Interprétabilité** — analyse **SHAP** (globale + locale).
+6. **Suivi d'expériences** — journalisation des runs avec **MLflow**.
+7. **Optimisation des hyperparamètres** — **GridSearchCV** sur les 3 modèles de boosting.
+8. **Décision métier** — choix du **seuil** optimal sur la classe minoritaire (recall / coût).
 
-## 🤖 Modèles comparés
+## 🤖 Comparaison de modèles
 
-Tous évalués avec le même protocole (K-Fold 5 plis, `random_state=50`, ROC AUC
-out-of-fold, gestion du déséquilibre par pondération « balanced »).
+Tous évalués avec le **même protocole** (K-Fold 5 plis, `random_state=50`, ROC AUC
+out-of-fold, déséquilibre géré par pondération « balanced ») via une fonction
+unifiée `run_cv_model('lgb' | 'xgb' | 'cat', ...)`.
 
-| Modèle | Famille | ROC AUC (indicatif) |
+| Modèle | Famille | ROC AUC OOF (indicatif) |
 |---|---|---|
 | Régression logistique | Linéaire | ≈ 0.67 |
 | Random Forest | Bagging | ≈ 0.68 |
-| **LightGBM** | Gradient boosting | ≈ 0.74 |
-| **XGBoost** | Gradient boosting | ≈ 0.74 |
-| **CatBoost** | Gradient boosting | ≈ 0.74 |
+| **LightGBM** | Gradient boosting | ≈ 0.76 |
+| **XGBoost** | Gradient boosting | ≈ 0.76 |
+| **CatBoost** | Gradient boosting | ≈ 0.76 |
 
-> Les scores de boosting montent encore avec les features « métier » (≈ 0.75).
-> Fonction unifiée `run_cv_model('lgb' | 'xgb' | 'cat', ...)` pour une comparaison équitable.
+> Les 3 boosters sont au coude à coude ; CatBoost est légèrement en tête et
+> surapprend le moins.
 
 ## 🔍 Interprétabilité (SHAP)
 
-`TreeExplainer` décompose chaque prédiction en contributions additives par feature :
+`TreeExplainer` décompose chaque prédiction en contributions additives :
 
-- **Global** (bar / beeswarm) : les scores externes `EXT_SOURCE_1/2/3` dominent
-  largement, suivis des montants et durées de crédit et des variables d'âge/emploi.
+- **Global** (bar / beeswarm) : `EXT_SOURCE_1/2/3` dominent largement, suivis des
+  montants/durées de crédit et des variables d'âge/emploi.
 - **Local** (waterfall) : explique *pourquoi* un dossier précis est jugé risqué —
-  utile pour la transparence et la conformité côté crédit.
+  utile pour la transparence côté crédit.
+
+## 📈 Suivi d'expériences (MLflow)
+
+Chaque entraînement est journalisé dans MLflow (backend **SQLite**) :
+
+- **Paramètres** : modèle, hyperparamètres, configuration de la validation croisée.
+- **Métriques** : ROC AUC out-of-fold, ROC AUC train, écart de surapprentissage, AUC par pli.
+- **Artefacts** : fichier de soumission, importances des features (CSV + graphique).
+
+Lancer l'interface pour comparer les runs :
+
+```bash
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
+# puis ouvrir http://localhost:5000  (choisir l'experience "home_credit_default_risk")
+```
+
+> Astuce macOS : le port 5000 est parfois pris par AirPlay — utiliser `--port 5001` au besoin.
+
+## 🛠️ Optimisation des hyperparamètres (GridSearchCV)
+
+`GridSearchCV` (scoring `roc_auc`, CV stratifiée) appliqué aux **3 boosters**
+via `tune_model('lgb' | 'xgb' | 'cat', ...)`, chaque meilleur réglage étant
+loggé dans MLflow (`*_gridsearch`). La recherche tourne sur un **sous-échantillon**
+pour rester rapide ; élargir les grilles ou `SUBSAMPLE` selon le temps disponible.
+
+| Modèle | Hyperparamètres réglés |
+|---|---|
+| LightGBM | `num_leaves`, `learning_rate`, `n_estimators` |
+| XGBoost | `max_depth`, `learning_rate`, `n_estimators` |
+| CatBoost | `depth`, `learning_rate`, `iterations` |
+
+## 🎚️ Choix du seuil de décision (métier)
+
+Le ROC AUC évalue le classement, pas la décision. Sur les probabilités
+**out-of-fold**, on choisit le seuil sur la classe minoritaire (`TARGET = 1`) :
+
+- **Courbe Precision-Recall** et **Precision / Recall / F2 selon le seuil**.
+- **Seuil F2-optimal** (favorise le recall).
+- **Courbe de coût métier** : `COST_FN` (défaut manqué) vs `COST_FP` (bon client refusé)
+  → **seuil coût-optimal**.
+- **Tableau comparatif** : défauts détectés / manqués et bons clients refusés selon le seuil.
 
 ## 🗂️ Structure
 
 ```
 .
-├── start-here-a-gentle-introduction.ipynb   # notebook principal (EDA → modèles → SHAP)
+├── start-here-a-gentle-introduction.ipynb   # notebook principal (EDA → modèles → SHAP → MLflow → tuning → seuil)
 ├── input/                                    # données Kaggle (non versionnées)
 ├── *.csv                                     # fichiers de soumission générés
+├── mlflow.db / mlruns/                       # tracking MLflow (non versionnés)
 ├── pyproject.toml                            # dépendances (uv)
 ├── uv.lock
 └── README.md
@@ -82,24 +126,22 @@ out-of-fold, gestion du déséquilibre par pondération « balanced »).
 Prérequis : **Python 3.13** et **[uv](https://docs.astral.sh/uv/)**.
 
 ```bash
-# Cloner puis installer les dépendances
 uv sync
 ```
 
-**Données** : elles ne sont pas versionnées (volumineuses). Télécharger les fichiers
-depuis la page Kaggle [Home Credit Default Risk](https://www.kaggle.com/c/home-credit-default-risk/data)
+**Données** (non versionnées, volumineuses) : télécharger les fichiers depuis
+[Home Credit Default Risk — Data](https://www.kaggle.com/c/home-credit-default-risk/data)
 et les placer dans `input/` (`application_train.csv`, `application_test.csv`, …).
 
 ## ▶️ Utilisation
 
 ```bash
-# Lancer Jupyter et ouvrir le notebook
-uv run jupyter lab
+uv run jupyter lab      # ouvrir et exécuter le notebook de haut en bas
 ```
 
-Exécuter les cellules de haut en bas. Les modèles produisent des fichiers de
-soumission au format Kaggle (`baseline_lgb.csv`, `baseline_xgb.csv`,
-`baseline_catboost.csv`, …).
+Les modèles produisent des fichiers de soumission au format Kaggle
+(`baseline_lgb.csv`, `baseline_xgb.csv`, `baseline_catboost.csv`, …) et les runs
+sont enregistrés dans MLflow.
 
 ## 🛣️ Roadmap
 
@@ -107,9 +149,11 @@ soumission au format Kaggle (`baseline_lgb.csv`, `baseline_xgb.csv`,
 - [x] Baseline (régression logistique) et Random Forest
 - [x] Comparaison LightGBM / XGBoost / CatBoost (protocole unifié)
 - [x] Interprétabilité SHAP (globale + locale)
-- [ ] **Suivi d'expériences avec MLflow** — journalisation des paramètres,
-      métriques (ROC AUC) et artefacts ; comparaison des runs ; *model registry*
-- [ ] Optimisation du **seuil de décision** (recall / coût métier)
+- [x] Suivi d'expériences avec MLflow (paramètres, métriques, artefacts)
+- [x] Optimisation des hyperparamètres (GridSearchCV sur les 3 boosters)
+- [x] Choix du seuil de décision (F2 / coût métier)
+- [ ] Réentraîner les meilleurs hyperparamètres sur données complètes (runs `*_tuned`)
+- [ ] *Model registry* MLflow — versionner et promouvoir le meilleur modèle
 - [ ] Industrialisation : packaging du pipeline, API de prédiction
 
 ## 👤 Auteur

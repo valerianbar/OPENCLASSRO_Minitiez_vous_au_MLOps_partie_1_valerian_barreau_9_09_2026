@@ -18,6 +18,7 @@ input/
 # Notebooks
 .ipynb_checkpoints/
 
-# MLflow (à venir)
+# MLflow
 mlruns/
 mlartifacts/
+mlflow.db
